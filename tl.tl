@@ -361,6 +361,7 @@ do
       ["for"] = true,
       ["function"] = true,
       ["goto"] = true,
+      ["implements"] = true,
       ["if"] = true,
       ["in"] = true,
       ["local"] = true,
@@ -5123,6 +5124,7 @@ local function init_globals(lax: boolean): {string:Variable}, {string:Type}
          a_type { typename = "function", args = TUPLE {}, rets = TUPLE { INTEGER, a } },
       } } end),
       ["load"] = a_type { typename = "function", args = TUPLE { UNION { STRING, LOAD_FUNCTION }, OPT(STRING), OPT(STRING), OPT(TABLE) }, rets = TUPLE { FUNCTION, STRING } },
+      ["loadstring"] = a_type { typename = "function", args = TUPLE { UNION { STRING, LOAD_FUNCTION }, OPT(STRING), OPT(STRING), OPT(TABLE) }, rets = TUPLE { FUNCTION, STRING } },
       ["loadfile"] = a_type { typename = "function", args = TUPLE { OPT(STRING), OPT(STRING), OPT(TABLE) }, rets = TUPLE { FUNCTION, STRING } },
       ["next"] = a_type {
          typename = "poly",
@@ -10740,7 +10742,7 @@ local function tl_package_loader(module_name: string): any
       -- TODO: should this be a hard error? this seems analogous to
       -- finding a lua file with a syntax error in it
       local code = assert(tl.pretty_print_ast(program, env.gen_target, true))
-      local chunk, err = load(code, "@" .. found_filename, "t")
+      local chunk, err = loadstring(code, "@" .. found_filename, "t")
       if chunk then
          return function(): any
             local ret = chunk()
@@ -10824,7 +10826,7 @@ tl.load = function(input: string, chunkname: string, mode: LoadMode, ...: {any:a
       return nil, err
    end
 
-   return load(code, chunkname, mode, ...)
+   return loadstring(code, chunkname, mode, ...)
 end
 
 return tl
