@@ -1136,6 +1136,9 @@ local record Type
    nominals: {string:{Type}}
    global_types: {string:boolean}
    narrows: {string:boolean}
+
+   -- implements
+   interfaces:  {Type}
 end
 
 local record Operator
@@ -2696,6 +2699,15 @@ parse_record_body = function(ps: ParseState, i: integer, def: Type, node: Node):
             def.is_userdata = true
          end
          i = i + 1
+      elseif ps.tokens[i].tk == "implements" and ps.tokens[i+1].tk ~= ":" then
+         i = i + 1
+         local t: Type
+         i, t = parse_type(ps, i)
+         if not t then
+            fail(ps, i, "expect a record type")
+         end
+         def.interfaces = def.interfaces or {}
+         table.insert(def.interfaces, t)
       elseif ps.tokens[i].tk == "{" then
          if def.typename == "arrayrecord" then
             i = failskip(ps, i, "duplicated declaration of array element type in record", parse_type)
@@ -3767,6 +3779,7 @@ function tl.pretty_print_ast(ast: Node, gen_target: TargetMode, mode: boolean | 
    end
 
    local function print_record_def(typ: Type): string
+      local hasInterfaces:boolean = typ.interfaces and #typ.interfaces > 0
       local out: {string} = { "{" }
       for _, name in ipairs(typ.field_order) do
          if is_typetype(typ.fields[name]) and is_record_type(typ.fields[name].def) then
@@ -3776,7 +3789,19 @@ function tl.pretty_print_ast(ast: Node, gen_target: TargetMode, mode: boolean | 
             table.insert(out, ", ")
          end
       end
+      if hasInterfaces then
+         table.insert(out, "__super = {")
+         for _, sup in ipairs(typ.interfaces) do
+            table.insert(out, show_type(sup))
+            table.insert(out, ", ")
+         end
+         table.insert(out, "}")
+      end
       table.insert(out, "}")
+      if hasInterfaces then
+         table.insert(out, 1, "setmetatable(")
+         table.insert(out, ", {__index = function(t, k) for _, cls in ipairs(t.__super) do if cls[k] ~= nil then return cls[k] end end end}")
+      end
       return table.concat(out)
    end
 
