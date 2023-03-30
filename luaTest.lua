@@ -1,18 +1,32 @@
 package.path = package.path .. ";./?.tl"
 local tl = require('tl')
 tl.loader()
+
 require('tlTest')
-local result, err = tl.gen([[
+local code = [[
 local record baseC
     basenum: number
+end
+function baseC:baseFunc()
+    print("baseFunc")
 end
 local record test
     implements baseC
     testNum:number
 end
-]])
+function test:testFunc()
+    print("testFunc")
+end
+local ins:test = setmetatable({}, {__index=test})
+ins:baseFunc()
+ins:testFunc()
+]]
+-- print(tl.gen(code))
+-- print(tl.check(code))
+local result, err = tl.load(code)
 
-print(result)
+result()
+
 
 function f(t, depth)
     depth = depth or 0
@@ -40,3 +54,4 @@ function f(t, depth)
 end
 
 -- f(err)
+-- print(err)

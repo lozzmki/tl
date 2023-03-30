@@ -3800,7 +3800,7 @@ function tl.pretty_print_ast(ast: Node, gen_target: TargetMode, mode: boolean | 
       table.insert(out, "}")
       if hasInterfaces then
          table.insert(out, 1, "setmetatable(")
-         table.insert(out, ", {__index = function(t, k) for _, cls in ipairs(t.__super) do if cls[k] ~= nil then return cls[k] end end end}")
+         table.insert(out, ", {__index = function(t, k) for _, cls in ipairs(t.__super) do if cls[k] ~= nil then return cls[k] end end end})")
       end
       return table.concat(out)
    end
@@ -6380,7 +6380,7 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
       local ok, fielderrs = match_record_fields(rec1, function(k: string): Type return rec2.fields[k] end, invariant)
       if not ok then
          local errs = {}
-         add_errs_prefixing(nil, fielderrs, errs, show_type(rec1) .. " is not a " .. show_type(rec2) .. ": ")
+         add_errs_prefixing(nil, fielderrs, errs, show_type(rec1) .. " is not a a " .. show_type(rec2) .. ": ")
          return false, errs
       end
       return true
@@ -6648,8 +6648,13 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
       return false
    end
 
+   local function check_implements(t1: Type, t2: Type): boolean
+
+   end
+
    local function are_same_nominals(t1: Type, t2: Type): boolean, {Error}
       local same_names: boolean
+      local debug_num: integer = 0
       if t1.found and t2.found then
          same_names = t1.found.typeid == t2.found.typeid
       else
@@ -6657,6 +6662,7 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
          local ft2 = t2.found or find_type(t2.names)
          if ft1 and ft2 then
             same_names = ft1.typeid == ft2.typeid
+            debug_num = 2
          else
             if are_same_unresolved_global_type(t1, t2) then
                return true
@@ -6700,7 +6706,7 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
                t2name = t2name .. " (defined in " .. t2r.filename .. ":" .. t2r.y .. ")"
             end
          end
-         return false, terr(t1, t1name .. " is not a " .. t2name)
+         return false, terr(t1, t1name .. " is not a b " .. t2name .. " " .. tostring(debug_num))
       end
    end
 
@@ -7595,10 +7601,15 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
       end
    end
 
-   local function match_record_key(tbl: Type, rec: Node, key: string): Type, string
+   local function match_record_key(tbl: Type, rec: Node, key: string, depth: integer): Type, string
       assert(type(tbl) == "table")
       assert(type(rec) == "table")
       assert(type(key) == "string")
+
+      depth = depth or 0
+      if depth > 255 then
+         return nil, "resolve stack overflow, maybe looped?"
+      end
 
       tbl = resolve_tuple_and_nominal(tbl)
 
@@ -7617,6 +7628,15 @@ tl.type_check = function(ast: Node, opts: TypeCheckOptions): Result, string
 
          if tbl.fields[key] then
             return tbl.fields[key]
+         end
+         if tbl.interfaces then
+            for _, t in ipairs(tbl.interfaces) do
+               local interface = resolve_tuple_and_nominal(resolve_typetype(t))
+               local rt, _ = match_record_key(interface, rec, key, depth + 1)
+               if rt then
+                  return rt
+               end
+            end
          end
 
          if rec.kind == "variable" then
